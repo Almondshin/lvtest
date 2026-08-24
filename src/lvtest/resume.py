@@ -28,11 +28,10 @@ def _from_pdf(path: Path) -> str:
 
 def _from_docx(path: Path) -> str:
     import docx
-    from docx.opc.exceptions import PackageNotFoundError
 
     try:
         document = docx.Document(str(path))
-    except (PackageNotFoundError, ValueError, KeyError) as e:
+    except Exception as e:  # Parser boundary: docx/lxml/zipfile can raise various exceptions
         raise _unreadable(path, f"DOCX를 읽을 수 없습니다: {e}") from e
     parts = [p.text for p in document.paragraphs if p.text.strip()]
     for table in document.tables:

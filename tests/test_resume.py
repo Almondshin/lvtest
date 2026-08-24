@@ -1,4 +1,5 @@
 from pathlib import Path
+import zipfile
 
 import docx
 import pytest
@@ -76,4 +77,27 @@ def test_unsupported_extension(tmp_path):
 def test_missing_file(tmp_path):
     with pytest.raises(LvtestError) as ei:
         extract_text(tmp_path / "nope.md")
+    assert ei.value.code == "resume_unreadable"
+
+
+def test_docx_with_corrupt_xml_is_unreadable(tmp_path):
+    # Create a valid DOCX, then corrupt its XML to test exception handling
+    src = tmp_path / "valid.docx"
+    d = docx.Document()
+    d.add_paragraph("Sample text")
+    d.save(src)
+
+    # Rewrite the DOCX with malformed XML in word/document.xml
+    dst = tmp_path / "corrupt.docx"
+    with zipfile.ZipFile(src) as src_zip:
+        with zipfile.ZipFile(dst, "w") as dst_zip:
+            for item in src_zip.infolist():
+                if item.filename == "word/document.xml":
+                    # Replace with malformed XML
+                    dst_zip.writestr(item, b"<w:document><unclosed")
+                else:
+                    dst_zip.writestr(item, src_zip.read(item.filename))
+
+    with pytest.raises(LvtestError) as ei:
+        extract_text(dst)
     assert ei.value.code == "resume_unreadable"
