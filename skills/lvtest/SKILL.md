@@ -90,7 +90,7 @@ uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest next <id>
 **3-3. 질문 기록 후 턴 종료**
 
 ```bash
-uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest ask <id> --question "<채팅에 출력한 질문 원문>"
+uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest ask <id> --question "<질문 문장 원문 — 진행 표시 [N/25 · 확정 M/7] 줄은 제외>"
 ```
 
 `ask`가 성공하면 **그 턴을 끝내고 사용자의 답변을 기다린다.** 추가 설명·격려를 붙이지 않는다.
@@ -167,6 +167,9 @@ uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest finish <id> --summary "<총평
 | `invalid_profile` | `fields`의 축을 고쳐 재시도. |
 | `invalid_grade` | `fields`를 고쳐 재시도, 2회 실패 시 `--ungradable`. |
 | `invalid_state` | 흐름이 어긋남. `lvtest status <id>`로 복구. |
+| `invalid_question` / `invalid_reason` | 내가 만든 CLI 인자가 잘못된 것. 메시지대로 고쳐서 재시도. |
+| `index_corrupt` | 이력 인덱스 손상. `$LVTEST_HOME/reports/index.json`(기본 `~/.lvtest/reports/index.json`)을 `index.json.bak`으로 옮긴 뒤 `lvtest finish <id>`를 다시 실행한다. 과거 세션과의 비교만 유실되고 리포트는 정상 생성된다. |
+| `invalid_rubric` | 플러그인 파일이 손상된 것. 재설치(`git pull` 후 재시작)를 안내하고 중단. |
 | `no_question` | 인터뷰가 끝난 것. `lvtest finish <id>`. |
 | `session_not_found` / `session_corrupt` | `lvtest sessions`로 목록 확인 후 사용자에게 선택 요청. |
 | `unknown_track` | v1은 `backend`만 지원. |
