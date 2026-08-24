@@ -1,0 +1,10 @@
+{
+  "name": "lvtest",
+  "version": "0.1.0",
+  "description": "이력서 기반 백엔드 개발자 레벨테스트 — 꼬리 질문 인터뷰와 루브릭 채점으로 축별 점수와 L1~L5 레벨을 판정",
+  "author": { "name": "Almondshin" },
+  "repository": "https://github.com/Almondshin/lvtest",
+  "license": "MIT",
+  "keywords": ["interview", "level-test", "backend", "resume", "rubric"],
+  "skills": "./skills/"
+}
