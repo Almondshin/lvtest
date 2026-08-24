@@ -54,7 +54,10 @@ def start(
 
 
 @app.command(help="Claude가 만든 축별 프로파일 JSON을 저장한다 (--json - 이면 stdin)")
-def profile(session_id: str, json_: str = typer.Option(..., "--json")) -> None:
+def profile(session_id: str, json_: str | None = typer.Option(None, "--json")) -> None:
+    if json_ is None:
+        _emit(LvtestError("invalid_json", "pass --json <profile> (or --json - for stdin)").to_dict())
+        raise typer.Exit(code=1)
     _run(lambda: engine.profile(session_id, _read_json_arg(json_, "profile")))
 
 
@@ -64,7 +67,10 @@ def next_cmd(session_id: str) -> None:
 
 
 @app.command(help="실제로 던진 질문을 기록한다")
-def ask(session_id: str, question: str = typer.Option(..., "--question")) -> None:
+def ask(session_id: str, question: str | None = typer.Option(None, "--question")) -> None:
+    if question is None:
+        _emit(LvtestError("invalid_question", 'pass --question "<text>"').to_dict())
+        raise typer.Exit(code=1)
     _run(engine.ask, session_id, question)
 
 

@@ -82,6 +82,17 @@ def test_grade_requires_json_or_ungradable(tmp_path):
     assert err["code"] == "invalid_json"
 
 
+def test_profile_requires_json(tmp_path):
+    sid = _ok(["start", _resume(tmp_path)])["session_id"]
+    assert _err(["profile", sid])["code"] == "invalid_json"
+
+
+def test_ask_requires_question(tmp_path):
+    sid = _ok(["start", _resume(tmp_path)])["session_id"]
+    _ok(["profile", sid, "--json", json.dumps(PROFILE, ensure_ascii=False)])
+    assert _err(["ask", sid])["code"] == "invalid_question"
+
+
 def test_module_entrypoint(tmp_path, isolated_home):
     env = {**os.environ, "LVTEST_HOME": str(isolated_home)}
     r = subprocess.run([sys.executable, "-m", "lvtest.cli", "--version"], capture_output=True, text=True, env=env)
