@@ -13,7 +13,10 @@ from lvtest.rubric import Rubric, load_rubric
 from lvtest.session import list_sessions, load_session, new_session_id, save_session
 from lvtest.grading import ungradable_grade, validate_grade
 from lvtest.models import Grade, Thread, Turn
-from lvtest.scoring import MAX_QUESTIONS, AxisStats, compute_all, termination_reason
+from lvtest.report import (
+    build_comparison, index_entry, load_index, previous_entry, render_report, report_path_for, upsert_index,
+)
+from lvtest.scoring import MAX_QUESTIONS, AxisStats, compute_all, compute_overall, termination_reason
 from lvtest.selector import choose_next
 
 RESUME_WARN_CHARS = 8000
@@ -280,7 +283,65 @@ def status(session_id: str) -> dict:
         },
     }
     if session.finished:
-        from lvtest.report import report_path_for  # 순환 import 회피
-
         out["report_path"] = str(report_path_for(session))
     return out
+
+
+_END_REASONS = ("done", "max", "user_stop")
+
+
+def finish(session_id: str, reason: str | None = None, summary: str | None = None, now: datetime | None = None) -> dict:
+    session = load_session(session_id)
+    _require_state(session, "need_question", "awaiting_answer", "need_finish", "finished")
+    if reason is not None and reason not in _END_REASONS:
+        raise LvtestError("invalid_reason", f"reason must be one of {list(_END_REASONS)}", reason=reason)
+    rubric = load_rubric(session.track)
+    if session.state != "finished":
+        session.end_reason = reason or session.end_reason or "user_stop"
+        session.finished = _stamp(now)
+        session.state = "finished"
+    if summary is not None:
+        session.summary = summary.strip() or None
+
+    stats = compute_all(session, rubric)
+    overall = compute_overall(stats)
+    index = load_index()
+    prev = previous_entry(index, session)
+    comparison = build_comparison(prev, stats, overall, session) if prev else None
+    path = report_path_for(session)
+    path.write_text(render_report(session, rubric, stats, overall, comparison), encoding="utf-8")
+    upsert_index(index, index_entry(session, stats, overall, path))
+    save_session(session)
+    return {
+        "report_path": str(path),
+        "end_reason": session.end_reason,
+        "has_summary": session.summary is not None,
+        "overall": {
+            "score": overall.score,
+            "level": overall.level,
+            "level_name": rubric.levels[overall.level] if overall.level else None,
+            "neighbor": overall.neighbor,
+            "bottleneck": overall.bottleneck,
+            "undetermined": overall.undetermined,
+        },
+        "axes": {
+            k: {"score": None if s.score is None else round(s.score, 2), "confidence": round(s.confidence, 2)}
+            for k, s in stats.items()
+        },
+        "comparison": comparison,
+    }
+
+
+def history() -> dict:
+    entries = sorted(load_index(), key=lambda e: e.get("created_at", ""), reverse=True)
+    return {"sessions": entries}
+
+
+def sessions() -> dict:
+    live = [s for s in list_sessions() if s.finished is None]
+    return {
+        "sessions": [
+            {"id": s.id, "created_at": s.created_at, "state": s.state, "question_no": s.question_no, "resume_path": s.resume.path}
+            for s in live
+        ]
+    }

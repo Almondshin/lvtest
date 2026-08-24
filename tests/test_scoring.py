@@ -112,3 +112,14 @@ def test_termination_max():
     grades = [(1, 0.1)] * MAX_QUESTIONS
     s = make_session(threads=[_thread("data_db", grades)])
     assert termination_reason(s, compute_all(s, r)) == "max"
+
+
+def test_bottleneck_ignores_float_noise_and_breaks_ties_by_rubric_order():
+    # 3 grades: 8.1/2.7 = 3.0000000000000004 ; 2 grades: 5.4/1.8 = 3.0 exactly
+    s = make_session(threads=[
+        _thread("api_design", [(3, 0.9), (3, 0.9), (3, 0.9)]),
+        _thread("security", [(3, 0.9), (3, 0.9)]),
+    ])
+    stats = compute_all(s, load_rubric())
+    assert stats["api_design"].score != stats["security"].score  # raw floats differ
+    assert compute_overall(stats).bottleneck == "api_design"      # rounded tie → rubric order

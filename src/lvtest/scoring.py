@@ -71,7 +71,7 @@ def compute_overall(stats: dict[str, AxisStats]) -> Overall:
         return Overall(None, None, None, None, undetermined)
     avg = sum(scored.values()) / len(scored)
     level, neighbor = level_from_overall(avg)
-    bottleneck = min(scored, key=lambda k: scored[k])
+    bottleneck = min(scored, key=lambda k: round(scored[k], 2))
     return Overall(round(avg, 2), level, neighbor, bottleneck, undetermined)
 
 
