@@ -144,6 +144,12 @@ def next_question(session_id: str) -> dict:
     stage = rubric.stages[choice.stage]
     thread_turns = session.threads[choice.thread_idx].turns if choice.thread_idx is not None else []
     hooks = session.profile[axis.key].hooks if session.profile and axis.key in session.profile else []
+    own = [
+        turn.question
+        for i, t in enumerate(session.threads)
+        if t.axis == axis.key and i != choice.thread_idx
+        for turn in t.turns
+    ]
     return {
         "continue": True,
         "axis": axis.key,
@@ -164,7 +170,7 @@ def next_question(session_id: str) -> dict:
             }
             for t in thread_turns
         ],
-        "avoid": [a.text for a in session.avoid_questions if a.axis == axis.key],
+        "avoid": [a.text for a in session.avoid_questions if a.axis == axis.key] + own,
         "progress": _progress(session, stats),
     }
 

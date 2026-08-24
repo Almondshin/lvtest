@@ -90,8 +90,12 @@ uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest next <id>
 **3-3. 질문 기록 후 턴 종료**
 
 ```bash
-uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest ask <id> --question "<질문 문장 원문 — 진행 표시 [N/25 · 확정 M/7] 줄은 제외>"
+uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest ask <id> --question - <<'TEXT'
+<질문 문장 원문 — 진행 표시 [N/25 · 확정 M/7] 줄은 제외>
+TEXT
 ```
+
+질문에 따옴표·$·백틱이 있어도 안전하도록 반드시 이 heredoc 형태를 쓴다.
 
 `ask`가 성공하면 **그 턴을 끝내고 사용자의 답변을 기다린다.** 추가 설명·격려를 붙이지 않는다.
 

@@ -2,9 +2,11 @@ import pytest
 
 from lvtest import engine
 from lvtest.errors import LvtestError
+from lvtest.models import Grade, Thread, Turn
+from lvtest.rubric import AXIS_KEYS
 from lvtest.scoring import MAX_QUESTIONS
-from lvtest.session import load_session
-from tests.conftest import NOW, PROFILE
+from lvtest.session import load_session, save_session
+from tests.conftest import NOW, PROFILE, make_session
 
 
 @pytest.fixture
@@ -162,3 +164,29 @@ def test_status_missing_session():
     with pytest.raises(LvtestError) as ei:
         engine.status("nope")
     assert ei.value.code == "session_not_found"
+
+
+def _closed_thread(axis, grades, questions=None):
+    questions = questions or [f"{axis} 질문 {i + 1}" for i in range(len(grades))]
+    turns = [
+        Turn(
+            question_no=i + 1,
+            stage=i + 1,
+            question=q,
+            asked_at=NOW.isoformat(timespec="seconds"),
+            grade=Grade(axis=axis, level_evidence=le, strength=st, quote="인용"),
+        )
+        for i, ((le, st), q) in enumerate(zip(grades, questions))
+    ]
+    return Thread(axis=axis, hook="h", open=False, turns=turns)
+
+
+def test_next_question_avoid_includes_own_earlier_thread():
+    # data_db has one weak, closed thread; every other axis is confirmed (two strong turns each).
+    threads = [_closed_thread("data_db", [(3, 0.4)], questions=["첫 데이터 질문"])]
+    threads += [_closed_thread(k, [(3, 0.9), (3, 0.9)]) for k in AXIS_KEYS if k != "data_db"]
+    s = make_session(id="avoid-own", threads=threads, state="need_question")
+    save_session(s)
+    out = engine.next_question("avoid-own")
+    assert out["axis"] == "data_db"
+    assert "첫 데이터 질문" in out["avoid"]

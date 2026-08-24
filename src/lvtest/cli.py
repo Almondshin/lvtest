@@ -19,6 +19,9 @@ def _run(fn, *args, **kwargs) -> None:
     except LvtestError as e:
         _emit(e.to_dict())
         raise typer.Exit(code=1)
+    except Exception as e:  # noqa: BLE001 — CLI boundary: stdout must stay a single JSON object
+        _emit({"error": {"code": "internal", "message": f"{type(e).__name__}: {e}"}})
+        raise typer.Exit(code=1)
 
 
 def _read_json_arg(value: str, what: str) -> dict:
@@ -71,6 +74,8 @@ def ask(session_id: str, question: str | None = typer.Option(None, "--question")
     if question is None:
         _emit(LvtestError("invalid_question", 'pass --question "<text>"').to_dict())
         raise typer.Exit(code=1)
+    if question == "-":
+        question = sys.stdin.read()
     _run(engine.ask, session_id, question)
 
 

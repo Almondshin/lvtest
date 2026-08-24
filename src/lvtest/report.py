@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from lvtest.errors import LvtestError
@@ -41,7 +42,10 @@ def load_index() -> list[dict]:
 def upsert_index(index: list[dict], entry: dict) -> None:
     index[:] = [e for e in index if e.get("id") != entry["id"]] + [entry]
     index.sort(key=lambda e: e.get("created_at", ""))
-    index_path().write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+    path = index_path()
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(index, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def previous_entry(index: list[dict], session: Session) -> dict | None:
@@ -186,7 +190,8 @@ def render_report(
     L.append("")
     L.append("## 약점")
     L.append("")
-    weakest = list(reversed(scored))[:2]
+    axis_order = {a.key: i for i, a in enumerate(rubric.axes)}
+    weakest = sorted(scored, key=lambda kv: (kv[1], axis_order[kv[0]]))[:2]
     for k, sc in weakest:
         gaps = _gaps(session, k)
         gap = f" — {', '.join(gaps[:2])}" if gaps else ""

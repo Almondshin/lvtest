@@ -93,6 +93,28 @@ def test_ask_requires_question(tmp_path):
     assert _err(["ask", sid])["code"] == "invalid_question"
 
 
+def test_ask_question_via_stdin(tmp_path):
+    sid = _ok(["start", _resume(tmp_path)])["session_id"]
+    _ok(["profile", sid, "--json", json.dumps(PROFILE, ensure_ascii=False)])
+    out = _ok(["ask", sid, "--question", "-"], input="stdin 질문")
+    assert out["question_no"] == 1
+    assert _ok(["status", sid])["last_question"] == "stdin 질문"
+
+
+def test_internal_error_wrapped_as_json(tmp_path, monkeypatch):
+    import lvtest.cli as cli_mod
+
+    def boom(*a, **k):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(cli_mod.engine, "history", boom)
+    r = runner.invoke(app, ["history"])
+    assert r.exit_code == 1
+    err = json.loads(r.stdout)["error"]
+    assert err["code"] == "internal"
+    assert "boom" in err["message"]
+
+
 def test_module_entrypoint(tmp_path, isolated_home):
     env = {**os.environ, "LVTEST_HOME": str(isolated_home)}
     r = subprocess.run([sys.executable, "-m", "lvtest.cli", "--version"], capture_output=True, text=True, env=env)

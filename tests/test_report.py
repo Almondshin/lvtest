@@ -107,6 +107,21 @@ def test_comparison_deltas():
     assert "## 지난 결과와 비교" in text and "| 보안·인증 | 2.0 | 3.0 | +1.0 |" in text
 
 
+def test_weakest_matches_bottleneck_tiebreak():
+    # all 7 axes tied at score 3.0 -> bottleneck tie-break picks rubric-order-first (api_design);
+    # 약점's first bullet must name the same axis, not the reverse-order one.
+    threads = [_thread(k, [(3, 0.9), (3, 0.9)]) for k in R.axis_keys]
+    s = make_session(threads=threads, state="finished", end_reason="done", finished="t")
+    stats = compute_all(s, R)
+    overall = compute_overall(stats)
+    assert overall.bottleneck == "api_design"
+    text = render_report(s, R, stats, overall, None)
+    assert "병목: API·서비스 설계" in text
+    section = text.split("## 약점")[1].split("## 다음 레벨로 가려면")[0]
+    first_bullet = next(line for line in section.splitlines() if line.startswith("- "))
+    assert "API·서비스 설계" in first_bullet
+
+
 def test_comparison_rubric_mismatch():
     prev = _finished_session(id="p", created_at="2026-08-01T00:00:00+00:00", rubric_version="0")
     pstats = compute_all(prev, R)
