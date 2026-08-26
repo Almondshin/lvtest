@@ -5,8 +5,9 @@ import typer
 
 from lvtest import __version__, engine
 from lvtest.errors import LvtestError
+from lvtest.rubric import DEFAULT_TRACK, TRACK_ALIASES, available_tracks
 
-app = typer.Typer(add_completion=False, help="이력서 기반 백엔드 레벨테스트 엔진")
+app = typer.Typer(add_completion=False, help="이력서 기반 개발자 레벨테스트 엔진 (backend / devops)")
 
 
 def _emit(obj) -> None:
@@ -51,7 +52,11 @@ def main(
 @app.command(help="이력서로 새 세션을 만든다")
 def start(
     resume_path: str = typer.Argument(..., help="pdf / docx / md 이력서 경로"),
-    track: str = typer.Option("backend", "--track"),
+    track: str = typer.Option(
+        DEFAULT_TRACK,
+        "--track",
+        help=f"평가 트랙 {available_tracks()} · 별칭 {sorted(TRACK_ALIASES)}",
+    ),
 ) -> None:
     _run(engine.start, resume_path, track)
 
@@ -106,6 +111,11 @@ def finish(
     summary: str | None = typer.Option(None, "--summary"),
 ) -> None:
     _run(engine.finish, session_id, reason, summary)
+
+
+@app.command(help="지원하는 평가 트랙과 축 목록")
+def tracks() -> None:
+    _run(engine.tracks)
 
 
 @app.command(help="완료된 세션 목록 (최신순)")

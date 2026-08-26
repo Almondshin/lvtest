@@ -1,7 +1,7 @@
 [project]
 name = "lvtest"
-version = "0.1.0"
-description = "이력서 기반 백엔드 개발자 레벨테스트 — 꼬리 질문 인터뷰 엔진"
+version = "0.2.0"
+description = "이력서 기반 개발자 레벨테스트 — 백엔드·데브옵스 트랙 꼬리 질문 인터뷰 엔진"
 requires-python = ">=3.11"
 dependencies = [
   "typer>=0.12",

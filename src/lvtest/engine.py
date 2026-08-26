@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from lvtest.errors import LvtestError
 from lvtest.models import AvoidQuestion, ProfileAxis, ResumeInfo, Session
 from lvtest.resume import extract_text
-from lvtest.rubric import Rubric, load_rubric
+from lvtest.rubric import TRACK_ALIASES, Rubric, available_tracks, load_rubric
 from lvtest.session import list_sessions, load_session, new_session_id, save_session
 from lvtest.grading import ungradable_grade, validate_grade
 from lvtest.models import Grade, Thread, Turn
@@ -46,11 +46,12 @@ def _axes_payload(rubric: Rubric) -> list[dict]:
 
 def start(
     resume_path: str,
-    track: str = "backend",
+    track: str | None = None,
     now: datetime | None = None,
     session_id: str | None = None,
 ) -> dict:
     rubric = load_rubric(track)
+    track = rubric.track  # 별칭('be', 'infra', ...)을 세션에는 정규화된 이름으로 남긴다
     path = Path(resume_path).expanduser()
     text = extract_text(path)
     sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
@@ -62,8 +63,10 @@ def start(
     past = list_sessions()
     for s in past:
         if s.finished is None and s.resume.sha256 == sha and s.id != session_id:
-            warnings.append(f"unfinished session '{s.id}' exists for this resume; `lvtest status {s.id}` to continue it")
-    avoid = [q for s in past if s.finished for q in s.all_questions()]
+            warnings.append(
+                f"unfinished {s.track} session '{s.id}' exists for this resume; `lvtest status {s.id}` to continue it"
+            )
+    avoid = [q for s in past if s.finished and s.track == track for q in s.all_questions()]
 
     ts = _now(now)
     session = Session(
@@ -336,6 +339,20 @@ def finish(session_id: str, reason: str | None = None, summary: str | None = Non
         },
         "comparison": comparison,
     }
+
+
+def tracks() -> dict:
+    out = []
+    for name in available_tracks():
+        rubric = load_rubric(name)
+        out.append({
+            "track": name,
+            "label": rubric.label,
+            "aliases": sorted(a for a, canonical in TRACK_ALIASES.items() if canonical == name),
+            "rubric_version": rubric.version,
+            "axes": _axes_payload(rubric),
+        })
+    return {"tracks": out}
 
 
 def history() -> dict:

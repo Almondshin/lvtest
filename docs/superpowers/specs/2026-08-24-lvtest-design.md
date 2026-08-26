@@ -361,3 +361,22 @@ CLI가 세션 상태에서 결정론적으로 렌더링한다. Claude가 쓰는 
 ## 10. v1 범위 밖
 
 GitHub 레포 분석, 로컬 레포 지정, 다른 트랙(프론트/데이터/인프라), 웹 리포트, MCP 래핑, 한국어 외 언어, 축 가중치 조정 UI.
+
+---
+
+## 11. v0.2 — devops 트랙 추가 (2026-08-26)
+
+10절에서 v1 범위 밖으로 미뤄 뒀던 **인프라 트랙**을 열었다. 트랙 seam(`start --track`, `rubric/<track>.yaml`)은 v1 설계 그대로 쓰고, 이를 막고 있던 전역 축 목록 검증만 걷어냈다.
+
+- `rubric.py`
+  - `AXIS_KEYS` → `BACKEND_AXIS_KEYS`, `DEVOPS_AXIS_KEYS` 로 분리. `Rubric` 검증은 **축 정확히 7개 · 키 중복 없음**만 보고, 축의 이름과 순서는 각 트랙 YAML이 정한다.
+  - `TRACK_ALIASES` (`be`/`server` → `backend`, `ops`/`infra`/`sre` → `devops`)와 `resolve_track()`. 잘못된 값은 `unknown_track` + `available`.
+  - `Rubric.label` — 리포트 제목에 쓰는 한국어 트랙 이름.
+  - `load_rubric()` 은 YAML의 `track` 필드가 파일 이름과 어긋나면 `invalid_rubric`.
+- `rubric/devops.yaml` — 7축(IaC·프로비저닝 / CI/CD·릴리스 / 컨테이너·오케스트레이션 / 관측·장애 대응 / 신뢰성·확장·용량 / 네트워크·인프라 / 보안·시크릿·컴플라이언스). stages·levels 구조는 backend와 동일.
+- `engine.start` 는 별칭을 정규 트랙 이름으로 바꿔 세션에 저장한다. `avoid_questions` 와 미완료 세션 경고도 트랙을 구분한다.
+- `lvtest tracks` — 트랙·별칭·축 목록을 JSON으로.
+
+세션 스키마, 채점·점수·종료 규칙, 리포트 형식은 그대로다. 트랙별 리포트 비교는 v1의 `previous_entry` 가 이미 `track` 으로 필터하고 있었으므로 손대지 않았다.
+
+**여전히 범위 밖**: 한 세션에서 두 트랙 동시 평가, 프론트/데이터 트랙, GitHub 레포 분석, 웹 리포트.

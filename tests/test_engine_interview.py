@@ -3,7 +3,7 @@ import pytest
 from lvtest import engine
 from lvtest.errors import LvtestError
 from lvtest.models import Grade, Thread, Turn
-from lvtest.rubric import AXIS_KEYS
+from lvtest.rubric import BACKEND_AXIS_KEYS
 from lvtest.scoring import MAX_QUESTIONS
 from lvtest.session import load_session, save_session
 from tests.conftest import NOW, PROFILE, make_session
@@ -184,7 +184,7 @@ def _closed_thread(axis, grades, questions=None):
 def test_next_question_avoid_includes_own_earlier_thread():
     # data_db has one weak, closed thread; every other axis is confirmed (two strong turns each).
     threads = [_closed_thread("data_db", [(3, 0.4)], questions=["첫 데이터 질문"])]
-    threads += [_closed_thread(k, [(3, 0.9), (3, 0.9)]) for k in AXIS_KEYS if k != "data_db"]
+    threads += [_closed_thread(k, [(3, 0.9), (3, 0.9)]) for k in BACKEND_AXIS_KEYS if k != "data_db"]
     s = make_session(id="avoid-own", threads=threads, state="need_question")
     save_session(s)
     out = engine.next_question("avoid-own")

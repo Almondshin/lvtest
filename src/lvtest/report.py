@@ -139,7 +139,7 @@ def render_report(
 ) -> str:
     name = {a.key: a.name for a in rubric.axes}
     L: list[str] = []
-    L.append(f"# 백엔드 레벨테스트 결과 — {session.created_at[:10]}")
+    L.append(f"# {rubric.label} 레벨테스트 결과 — {session.created_at[:10]}")
     L.append("")
 
     # 종합

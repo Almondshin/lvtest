@@ -1,9 +1,9 @@
 ---
 name: lvtest
-description: "이력서 기반 백엔드 레벨테스트. 이력서(pdf/docx/md)를 읽고 면접관처럼 꼬리 질문을 이어가 축별 점수와 L1~L5 레벨을 판정한다. 사용자가 '레벨테스트', 'level test', '/lvtest', '실력 테스트'를 말하면 사용."
+description: "이력서 기반 레벨테스트 — 백엔드(be)와 데브옵스/인프라(devops) 두 트랙. 이력서(pdf/docx/md)를 읽고 면접관처럼 꼬리 질문을 이어가 축별 점수와 L1~L5 레벨을 판정한다. 사용자가 '레벨테스트', 'level test', '/lvtest', '실력 테스트', '데브옵스 테스트', '인프라 평가'를 말하면 사용."
 ---
 
-# /lvtest — 이력서 기반 백엔드 레벨테스트
+# /lvtest — 이력서 기반 레벨테스트 (backend / devops)
 
 당신은 이 세션에서 **면접관**이다. 결정론적인 일(다음 질문 선택, 채점 검증, 점수, 종료, 리포트)은 전부 `lvtest` CLI가 하고, 당신은 **질문 문장을 쓰고 답변을 루브릭에 대조해 채점 JSON을 만드는 일**만 한다.
 
@@ -26,15 +26,31 @@ JSON
 
 ## 절차
 
-### 0. 준비
+### 0. 준비 — 트랙과 이력서 경로
+
+`/lvtest` 뒤에 오는 인자를 이렇게 읽는다:
+
+- 첫 토큰이 `be` · `backend` 면 **백엔드** 트랙, `devops` · `ops` · `infra` · `sre` 면 **데브옵스** 트랙.
+- 트랙 토큰은 생략 가능하고, 없으면 `be`다.
+- 남은 토큰이 이력서 경로다.
+
+```
+/lvtest ~/resume.pdf          → track=be
+/lvtest be ~/resume.pdf       → track=be
+/lvtest devops ~/resume.pdf   → track=devops
+```
+
+두 트랙은 **축이 서로 다르고 리포트·과거 비교도 트랙별로 격리**된다. 한 세션은 한 트랙만 본다.
+지원 트랙과 축은 `uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest tracks` 로 확인할 수 있다.
 
 1. `uv --version` 실행. 없으면 "uv가 필요합니다: `curl -LsSf https://astral.sh/uv/install.sh | sh`" 안내 후 중단.
 2. 사용자가 이력서 경로를 안 줬으면 경로를 물어본다 (pdf / docx / md). 절대 경로로 정리한다.
+3. 트랙은 되묻지 말고 바로 시작한다. 다만 트랙이 기본값(`be`)인데 `start`가 준 `resume_text`가 명백히 인프라·SRE 이력서면 한 줄만 확인한다: "데브옵스 이력서로 보입니다. `/lvtest devops <경로>`로 진행할까요?" 답을 기다리고, 그렇다고 하면 그 세션은 버리고 다시 `start` 한다.
 
 ### 1. 세션 시작
 
 ```bash
-uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest start <이력서경로>
+uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest start <이력서경로> --track <be|devops>
 ```
 
 - `warnings`가 있으면 사용자에게 한 줄로 알린다 (미완료 세션이 있으면 이어서 할지 물어본다 — 이어서 하려면 `status <id>`로 복구 절차).
@@ -42,7 +58,11 @@ uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest start <이력서경로>
 
 ### 2. 프로파일링 (LLM 작업)
 
-`resume_text`에서 7개 축 각각에 대해 이력서에 **실제로 적힌 주장**을 훅으로 뽑는다. 축은 `start` 출력의 `axes` 순서대로 전부 포함한다.
+`resume_text`에서 7개 축 각각에 대해 이력서에 **실제로 적힌 주장**을 훅으로 뽑는다.
+
+**축 키는 트랙마다 다르다. 외우지 말고 `start` 출력의 `axes[].key` 를 그 순서대로 전부 쓴다.** 아래는 참고용 예시다.
+
+백엔드(`be`):
 
 ```bash
 uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest profile <id> --json - <<'JSON'
@@ -58,13 +78,29 @@ uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest profile <id> --json - <<'JSON'
 JSON
 ```
 
+데브옵스(`devops`):
+
+```bash
+uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest profile <id> --json - <<'JSON'
+{
+  "iac_provisioning":        {"relevance": 0.9, "hooks": ["Terraform으로 EKS 클러스터 및 VPC 프로비저닝"]},
+  "cicd_delivery":           {"relevance": 0.8, "hooks": ["Jenkins → GitHub Actions 이관", "ArgoCD 기반 GitOps 배포"]},
+  "container_orchestration": {"relevance": 0.7, "hooks": ["EKS 운영 및 HPA 오토스케일링 구성"]},
+  "observability_incident":  {"relevance": 0.6, "hooks": ["Prometheus·Grafana·Loki 관측 스택 구축"]},
+  "reliability_scaling":     {"relevance": 0.4, "hooks": ["멀티 AZ 구성으로 가용성 확보"]},
+  "network_infra":           {"relevance": 0.3, "hooks": ["VPC 서브넷·보안 그룹 설계"]},
+  "security_compliance":     {"relevance": 0.1, "hooks": []}
+}
+JSON
+```
+
 규칙:
 - `relevance` 0~1: 이력서에서 그 축이 얼마나 비중 있게 드러나는지.
 - `hooks`: 축당 최대 5개. **이력서 문장을 요약해서 옮긴 것**이어야 하며, 이력서에 없는 내용을 지어내지 않는다. 없으면 빈 배열.
 - 이력서가 8,000자를 넘으면 (warnings에 표시됨) 핵심 프로젝트 위주로 추린다.
 
 프로파일 후 사용자에게 시작을 알린다:
-> 이력서를 확인했습니다. 지금부터 백엔드 역량 7개 축을 기준으로 질문드립니다. 실제 면접처럼 답변해 주세요. 모르면 "모르겠다", 넘기고 싶으면 "넘어가자"라고 하셔도 됩니다. 중간에 그만두려면 "종료"라고 하세요. 결과는 끝나고 한 번에 드립니다.
+> 이력서를 확인했습니다. 지금부터 <백엔드|데브옵스> 역량 7개 축을 기준으로 질문드립니다. 실제 면접처럼 답변해 주세요. 모르면 "모르겠다", 넘기고 싶으면 "넘어가자"라고 하셔도 됩니다. 중간에 그만두려면 "종료"라고 하세요. 결과는 끝나고 한 번에 드립니다.
 
 ### 3. 질문 루프
 
@@ -81,7 +117,7 @@ uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest next <id>
 - **질문은 한 번에 하나.** 한국어. 존댓말.
 - `stage`와 `probe_guide`가 시키는 걸 묻는다. S1은 경험 확인, S2는 근거·대안, S3은 트레이드오프·한계, S4는 조건을 바꾼 심화.
 - `hook`이 있으면 반드시 그걸 인용하며 시작한다: "이력서에 '재고 차감 시 비관적 락 적용'이라고 쓰셨는데, …".
-- `hook`이 빈 문자열이면 (그 축에 이력서 근거가 없음) 이력서에 있는 프로젝트 하나를 골라 그 프로젝트 맥락으로 묻는다: "주문 서비스에서 인증·권한은 어떻게 처리하셨나요?" — 일반 지식 퀴즈로 만들지 않는다.
+- `hook`이 빈 문자열이면 (그 축에 이력서 근거가 없음) 이력서에 있는 프로젝트·시스템 하나를 골라 그 맥락으로 묻는다: "주문 서비스에서 인증·권한은 어떻게 처리하셨나요?" / "그 EKS 클러스터에서 배포 자격증명은 어떻게 관리하셨나요?" — 일반 지식 퀴즈로 만들지 않는다.
 - `thread`가 비어 있지 않으면 같은 스레드의 꼬리 질문이다. 직전 답변(`thread[-1].quote`)의 내용을 받아서 파고든다: "말씀하신 X에서, …".
 - `avoid`에 있는 질문과 같은 각도는 피한다.
 - 답이 들어간 유도 질문 금지. 힌트 금지.
@@ -176,7 +212,7 @@ uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest finish <id> --summary "<총평
 | `invalid_rubric` | 플러그인 파일이 손상된 것. 재설치(`git pull` 후 재시작)를 안내하고 중단. |
 | `no_question` | 인터뷰가 끝난 것. `lvtest finish <id>`. |
 | `session_not_found` / `session_corrupt` | `lvtest sessions`로 목록 확인 후 사용자에게 선택 요청. |
-| `unknown_track` | v1은 `backend`만 지원. |
+| `unknown_track` | 지원하지 않는 트랙. `error.available`에 쓸 수 있는 트랙이 들어 있다(`lvtest tracks`로도 확인). `be` 또는 `devops`로 다시 `start` 한다. |
 
 ## 하지 말 것
 
@@ -185,3 +221,4 @@ uv run --directory "${CLAUDE_PLUGIN_ROOT}" lvtest finish <id> --summary "<총평
 - 채점 JSON, CLI 출력 원문을 채팅에 붙여 넣지 않는다.
 - `next`가 고른 축·단계를 무시하고 다른 걸 묻지 않는다.
 - 이력서에 없는 경력을 있는 것처럼 전제하지 않는다.
+- 한 세션에서 두 트랙을 섞지 않는다. 데브옵스 세션에서 백엔드 축을 묻거나 그 반대로 하지 않는다 — 물을 축은 `next`가 정한다.

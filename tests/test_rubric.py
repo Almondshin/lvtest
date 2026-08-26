@@ -1,14 +1,14 @@
 import pytest
 
 from lvtest.errors import LvtestError
-from lvtest.rubric import AXIS_KEYS, load_rubric, parse_rubric
+from lvtest.rubric import BACKEND_AXIS_KEYS, load_rubric, parse_rubric
 
 
 def test_backend_rubric_loads_with_seven_axes():
     r = load_rubric("backend")
     assert r.version == "1"
     assert r.track == "backend"
-    assert r.axis_keys == AXIS_KEYS == [
+    assert r.axis_keys == BACKEND_AXIS_KEYS == [
         "api_design", "data_db", "concurrency_perf", "architecture",
         "testing_quality", "ops_infra", "security",
     ]
@@ -43,11 +43,11 @@ def _minimal_axis():
 
 def _minimal_data():
     return {
-        "version": "1", "track": "backend",
+        "version": "1", "track": "backend", "label": "백엔드",
         "levels": {1: "a", 2: "b", 3: "c", 4: "d", 5: "e"},
         "stages": {1: {"goal": "g", "pass_level": 2}, 2: {"goal": "g", "pass_level": 3},
                    3: {"goal": "g", "pass_level": 4}, 4: {"goal": "g", "pass_level": 5}},
-        "axes": {k: _minimal_axis() for k in AXIS_KEYS},
+        "axes": {k: _minimal_axis() for k in BACKEND_AXIS_KEYS},
     }
 
 
@@ -60,9 +60,32 @@ def test_parse_rejects_missing_level_anchor():
     assert "security" in ei.value.message
 
 
-def test_parse_rejects_wrong_axis_order():
+def test_parse_rejects_wrong_axis_count():
+    data = _minimal_data()
+    del data["axes"]["security"]
+    with pytest.raises(LvtestError) as ei:
+        parse_rubric(data)
+    assert ei.value.code == "invalid_rubric"
+    assert "7" in ei.value.message
+
+
+def test_parse_keeps_the_axis_order_the_file_declares():
     data = _minimal_data()
     axes = data["axes"]
-    data["axes"] = {k: axes[k] for k in reversed(AXIS_KEYS)}
-    with pytest.raises(LvtestError):
-        parse_rubric(data)
+    data["axes"] = {k: axes[k] for k in reversed(BACKEND_AXIS_KEYS)}
+    assert parse_rubric(data).axis_keys == list(reversed(BACKEND_AXIS_KEYS))
+
+
+def test_load_rejects_rubric_whose_track_field_disagrees_with_its_filename(tmp_path, monkeypatch):
+    import yaml
+
+    from lvtest import rubric as rubric_mod
+
+    data = _minimal_data()
+    data["track"] = "devops"
+    path = tmp_path / "backend.yaml"
+    path.write_text(yaml.safe_dump(data, allow_unicode=True), encoding="utf-8")
+    monkeypatch.setattr(rubric_mod, "rubric_path", lambda track: tmp_path / f"{track}.yaml")
+    with pytest.raises(LvtestError) as ei:
+        load_rubric("backend")
+    assert ei.value.code == "invalid_rubric"

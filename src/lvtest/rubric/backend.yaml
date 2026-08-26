@@ -1,5 +1,6 @@
 version: "1"
 track: backend
+label: 백엔드
 levels:
   1: 입문
   2: 주니어
